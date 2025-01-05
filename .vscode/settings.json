@@ -1,0 +1,8 @@
+{
+  "editor.formatOnSave": false,
+  "editor.tabSize": 2,
+  "autopep8.args": [
+    "--indent-size=2",
+    "--max-line-length=350"
+  ], //开启文件保存时自动格式化
+}
