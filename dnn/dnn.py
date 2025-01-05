@@ -15,15 +15,6 @@ config = {
 }
 
 
-def same_seed(seed=0): 
-  torch.backends.cudnn.deterministic = True
-  torch.backends.cudnn.benchmark = False
-  np.random.seed(seed)
-  torch.manual_seed(seed)
-  if torch.cuda.is_available():
-    torch.cuda.manual_seed_all(seed)
-
-
 class COVID19Dataset(torch.utils.data.Dataset):
   def __init__(self, x, y=None):
     if y is None:
@@ -153,8 +144,12 @@ class Train:
 if __name__ == '__main__':
   device = torch.device('cuda') if torch.cuda.is_available else torch.device('cpu')
   print(device)
-  same_seed()
-  data = Data('./covid.train.csv', './covid.test.csv')
+  import common 
+  common.same_seed()
+
+  current_directory_path = os.path.dirname(os.path.abspath(__file__))
+  datadir = current_directory_path + '/../data/dnn'
+  data = Data(datadir+'/covid.train.csv', datadir+'/covid.test.csv')
   data.load_data(config['valid_ratio'])
   data.select_feat_label(select_all=True)
 
