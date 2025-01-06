@@ -97,49 +97,55 @@ class CovidModel(torch.nn.Module):
 
 
 class Train:
-  def __init__(self, batchsize, ecpochs, modelpath):
+  def __init__(self, data:Data, model:CovidModel, device, batchsize, ecpochs, modelpath):
+    self.data = data
+    self.model = model
+    self.device = device
     self.batchsize = batchsize
     self.epochs = ecpochs
     self.modelpath = modelpath
+    self.best_loss = math.inf
 
-  def do_train(self, data:Data, model:CovidModel, device):
-    data.load_pytorch_dataset(self.batchsize)
-
+  def do_train(self):
     criterion = torch.nn.MSELoss(reduction='mean') # 损失函数的定义
-    optimizer = torch.optim.SGD(model.parameters(), lr=config['learning_rate']) 
-    
-    best_loss, nbatch = math.inf, 0
+    optimizer = torch.optim.SGD(self.model.parameters(), lr=config['learning_rate']) 
+    device = self.device
     for epoch in range(self.epochs):
-      model.train() # 训练模式
+      self.model.train() # 训练模式
       train_loss_record = []
 
-      for x, y in data.train_loader:
+      for x, y in self.data.train_loader:
         x, y = x.to(device), y.to(device)   # 将数据一到相应的存储位置(CPU/GPU)
-        pred = model(x)             
+        pred = self.model(x)             
         loss = criterion(pred, y)
         optimizer.zero_grad()               # 将梯度置0.
         loss.backward()                     # 反向传播 计算梯度.
         optimizer.step()                    # 更新网络参数
-        nbatch += 1
         train_loss_record.append(loss.detach().item())
       mean_train_loss = sum(train_loss_record)/len(train_loss_record)
       print(f"in epoch[{epoch}]/[{self.epochs}] trainloss[{mean_train_loss }]")
+      self.do_validate()
 
-      model.eval() # 将模型设置成 evaluation 模式.
-      valid_loss_record = []
-      for x, y in data.valid_loader:
-        x, y = x.to(device), y.to(device)
-        with torch.no_grad():
-          pred = model(x)
-          loss = criterion(pred, y)
-        valid_loss_record.append(loss.item())
-      mean_valid_loss = sum(valid_loss_record)/len(valid_loss_record)
-      print(f"in epoch[{epoch}]/[{self.epochs}] validloss[{mean_train_loss }]")
 
-      if mean_valid_loss < best_loss:
-        best_loss = mean_valid_loss
-        torch.save(model.state_dict(), self.modelpath) # 模型保存
-        print('Saving model with loss {:.3f}...'.format(best_loss))
+  def do_validate(self):
+    criterion = torch.nn.MSELoss(reduction='mean') # 损失函数的定义
+    device = self.device
+    self.model.eval() # 将模型设置成 evaluation 模式.
+    valid_loss_record = []
+    for x, y in self.data.valid_loader:
+      x, y = x.to(device), y.to(device)
+      with torch.no_grad():
+        pred = self.model(x)
+        loss = criterion(pred, y)
+      valid_loss_record.append(loss.item())
+    mean_valid_loss = sum(valid_loss_record)/len(valid_loss_record)
+    print(f"validloss[{mean_valid_loss}]")
+    if mean_valid_loss < self.best_loss:
+      self.best_loss = mean_valid_loss
+      torch.save(self.model.state_dict(), self.modelpath) # 模型保存
+      print('Saving model with loss {:.3f}...'.format(self.best_loss))
+
+
 
 if __name__ == '__main__':
   device = torch.device('cuda') if torch.cuda.is_available else torch.device('cpu')
@@ -152,10 +158,14 @@ if __name__ == '__main__':
   data = Data(datadir+'/covid.train.csv', datadir+'/covid.test.csv')
   data.load_data(config['valid_ratio'])
   data.select_feat_label(select_all=True)
+  data.load_pytorch_dataset(config['batch_size'])
 
   n_feaures = len(data.x_train_data[0])
   print(f"n_feaures[{n_feaures}]")
-  hiddens = [n_feaures, 1000, 800, 900, 9000, 9000]
+  hiddens = [n_feaures, 10, 9]
   model = CovidModel(n_feaures, hiddens).to(device) # 将模型和训练数据放在相同的存储位置(CPU/GPU)
-  train = Train(config['batch_size'], config['n_epochs'], config['save_path'])
-  train.do_train(data, model, device)
+  common.model_plot(model, torch.randn(1, n_feaures).requires_grad_(True).to(device))
+
+  train = Train(data, model, device, config['batch_size'], config['n_epochs'], config['save_path'])
+  train.do_validate()
+  train.do_train()

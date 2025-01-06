@@ -6,7 +6,7 @@ import math
 import os
 import random
 import torch.nn as nn
-import torchvisiotorchvisionn.transforms as transforms
+import torchvision.transforms as transforms
 from PIL import Image
 import matplotlib.pyplot as plt
 from torchviz import make_dot
@@ -70,7 +70,7 @@ def quick_observe(train_dir_root):
 
     plt.show()
 
-train_dir_root = '../input/ml2022spring-hw3b/food11/training'
+train_dir_root = '/home/liyuan/cpp/dp/data/cnn/food11/training'
 quick_observe(train_dir_root)
 
 
@@ -249,7 +249,7 @@ def trainer(train_loader, valid_loader, model, config, device, rest_net_flag=Fal
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 config = {
     'seed': 6666,
-    'dataset_dir': "../input/ml2022spring-hw3b/food11",
+    'dataset_dir': "/home/liyuan/cpp/dp/data/cnn/food11/",
     'n_epochs': 10,      
     'batch_size': 64, 
     'learning_rate': 0.0003,           
