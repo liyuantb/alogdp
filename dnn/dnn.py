@@ -91,6 +91,7 @@ class CovidModel(torch.nn.Module):
     self.layers.append(module)
 
   def forward(self, x):
+    print(x.size())
     x = self.layers(x)
     x = x.squeeze(1) # (B, 1) -> (B)
     return x
