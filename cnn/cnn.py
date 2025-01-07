@@ -1,7 +1,6 @@
-
 import torch
-import math
-import os
+import math, os
+import tqdm
 import torch.nn as nn
 import torchvision.transforms as transforms
 from PIL import Image
@@ -135,17 +134,21 @@ class Train:
     self.epochs = ecpochs
     self.modelpath = modelpath
     self.best_loss = math.inf
+    self.tqdmobj = None
+    self.tqdmpost = {}
 
   def do_train(self):
     criterion = nn.CrossEntropyLoss(ignore_index=-1)  # 交叉熵计算时，label范围为[0, n_classes-1]
     optimizer = torch.optim.Adam(self.model.parameters(), lr=config['learning_rate'], weight_decay=config['weight_decay'])
     device = self.device
 
-    for epoch in range(self.epochs):
+    self.tqdmobj = tqdm.tqdm(range(self.epochs))
+    for epoch in self.tqdmobj:
+      self.tqdmobj.set_description('epoch[%s/%s]' % (epoch, self.epochs))
+      self.tqdmobj.set_postfix(self.tqdmpost)
       self.model.train()
       loss_record = []
       train_accs = []
-      print(f"Epoch [{epoch+1}/{self.epochs}]")
       for x, y in self.data.train_loader:
         optimizer.zero_grad()
         x, y = x.to(device), y.to(device)
@@ -159,7 +162,8 @@ class Train:
         train_accs.append(acc.detach().item())
       mean_train_acc = sum(train_accs) / len(train_accs)
       mean_train_loss = sum(loss_record)/len(loss_record)
-      print(f'Epoch TrainLoss:{mean_train_loss:.4f}, TrainAcc:{mean_train_acc:.4f}')
+      self.tqdmpost['TrainLoss'] = mean_train_loss
+      self.tqdmpost['TrainAcc'] = mean_train_acc
       self.do_validate()
 
   def do_validate(self):
@@ -178,7 +182,8 @@ class Train:
       test_accs.append(acc.detach().item())
     mean_valid_acc = sum(test_accs) / len(test_accs)
     mean_valid_loss = sum(loss_record)/len(loss_record)
-    print(f'Epoch ValidLoss:{mean_valid_loss:.4f}, ValidAcc:{mean_valid_acc:.4f}')
+    self.tqdmpost['ValidLoss'] = mean_valid_loss
+    self.tqdmpost['ValidAcc'] = mean_valid_acc
     if mean_valid_loss < self.best_loss:
       self.best_loss = mean_valid_loss
       torch.save(model.state_dict(), self.modelpath)  # 保存最优模型

@@ -2,6 +2,7 @@ import os, sys, math
 import torch
 import pandas as pd
 import numpy as np
+import tqdm
 
 config = {
   'seed': 5201314,      # 随机种子，可以自己填写. :)
@@ -91,7 +92,7 @@ class CovidModel(torch.nn.Module):
     self.layers.append(module)
 
   def forward(self, x):
-    print(x.size())
+    #print(x.size())
     x = self.layers(x)
     x = x.squeeze(1) # (B, 1) -> (B)
     return x
@@ -106,12 +107,17 @@ class Train:
     self.epochs = ecpochs
     self.modelpath = modelpath
     self.best_loss = math.inf
+    self.tqdmobj = None
+    self.tqdmpost = {}
 
   def do_train(self):
     criterion = torch.nn.MSELoss(reduction='mean') # 损失函数的定义
     optimizer = torch.optim.SGD(self.model.parameters(), lr=config['learning_rate']) 
     device = self.device
-    for epoch in range(self.epochs):
+    self.tqdmobj = tqdm.tqdm(range(self.epochs))
+    for epoch in self.tqdmobj:
+      self.tqdmobj.set_description('epoch[%s/%s]' % (epoch, self.epochs))
+      self.tqdmobj.set_postfix(self.tqdmpost)
       self.model.train() # 训练模式
       train_loss_record = []
 
@@ -124,7 +130,7 @@ class Train:
         optimizer.step()                    # 更新网络参数
         train_loss_record.append(loss.detach().item())
       mean_train_loss = sum(train_loss_record)/len(train_loss_record)
-      print(f"in epoch[{epoch}]/[{self.epochs}] trainloss[{mean_train_loss }]")
+      self.tqdmpost['trainloss'] = mean_train_loss
       self.do_validate()
 
 
@@ -140,7 +146,7 @@ class Train:
         loss = criterion(pred, y)
       valid_loss_record.append(loss.item())
     mean_valid_loss = sum(valid_loss_record)/len(valid_loss_record)
-    print(f"validloss[{mean_valid_loss}]")
+    self.tqdmpost['validloss'] = mean_valid_loss
     if mean_valid_loss < self.best_loss:
       self.best_loss = mean_valid_loss
       torch.save(self.model.state_dict(), self.modelpath) # 模型保存
